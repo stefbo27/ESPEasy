@@ -1,3 +1,4 @@
+#ifdef USES_P034
 //#######################################################################################################
 //######################## Plugin 034: Temperature and Humidity sensor DHT 12 (I2C) #####################
 //#######################################################################################################
@@ -50,16 +51,15 @@ boolean Plugin_034(byte function, struct EventStruct *event, String& string)
     case PLUGIN_READ:
       {
         byte dht_dat[5];
-        byte dht_in;
+        // byte dht_in;
         byte i;
-        byte Retry = 0;
+        // byte Retry = 0;
         boolean error = false;
 
         Wire.beginTransmission(DHT12_I2C_ADDRESS); // start transmission to device
         Wire.write(0); // sends register address to read from
         Wire.endTransmission(); // end transmission
 
-        Wire.beginTransmission(DHT12_I2C_ADDRESS); // start transmission to device
         if (Wire.requestFrom(DHT12_I2C_ADDRESS, 5) == 5) { // send data n-bytes read
           for (i = 0; i < 5; i++)
           {
@@ -110,3 +110,4 @@ boolean Plugin_034(byte function, struct EventStruct *event, String& string)
   }
   return success;
 }
+#endif // USES_P034

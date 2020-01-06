@@ -1,3 +1,4 @@
+#ifdef USES_P051
 //#######################################################################################################
 //#################### Plugin 051 Temperature and Humidity Sensor AM2320 ##############
 //#######################################################################################################
@@ -9,13 +10,12 @@
 // of the above library
 //
 
-#ifdef PLUGIN_BUILD_TESTING
 
 #include <AM2320.h>
 
 #define PLUGIN_051
 #define PLUGIN_ID_051        51
-#define PLUGIN_NAME_051       "Environment - AM2320 [TEST]"
+#define PLUGIN_NAME_051       "Environment - AM2320 [TESTING]"
 #define PLUGIN_VALUENAME1_051 "Temperature"
 #define PLUGIN_VALUENAME2_051 "Humidity"
 
@@ -81,6 +81,7 @@ boolean Plugin_051(byte function, struct EventStruct *event, String& string)
           	addLog(LOG_LEVEL_ERROR, F("AM2320: Sensor offline"));
             break;
           case 0:
+          {
           	UserVar[event->BaseVarIndex] = th.t;
           	UserVar[event->BaseVarIndex + 1] = th.h;
 
@@ -92,6 +93,7 @@ boolean Plugin_051(byte function, struct EventStruct *event, String& string)
           	addLog(LOG_LEVEL_INFO, log);
             success = true;
             break;
+          }
         }
 
 
@@ -101,4 +103,4 @@ boolean Plugin_051(byte function, struct EventStruct *event, String& string)
 }
 
 
-#endif
+#endif // USES_P051

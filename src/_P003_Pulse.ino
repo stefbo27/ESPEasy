@@ -1,10 +1,11 @@
+#ifdef USES_P003
 //#######################################################################################################
 //#################################### Plugin 003: Pulse  ###############################################
 //#######################################################################################################
 
 #define PLUGIN_003
 #define PLUGIN_ID_003         3
-#define PLUGIN_NAME_003       "Pulse Counter"
+#define PLUGIN_NAME_003       "Generic - Pulse counter"
 #define PLUGIN_VALUENAME1_003 "Count"
 #define PLUGIN_VALUENAME2_003 "Total"
 #define PLUGIN_VALUENAME3_003 "Time"
@@ -14,16 +15,18 @@ void Plugin_003_pulse_interrupt1() ICACHE_RAM_ATTR;
 void Plugin_003_pulse_interrupt2() ICACHE_RAM_ATTR;
 void Plugin_003_pulse_interrupt3() ICACHE_RAM_ATTR;
 void Plugin_003_pulse_interrupt4() ICACHE_RAM_ATTR;
+void Plugin_003_pulsecheck(byte Index) ICACHE_RAM_ATTR;
+
 //this takes 20 bytes of IRAM per handler
 // void Plugin_003_pulse_interrupt5() ICACHE_RAM_ATTR;
 // void Plugin_003_pulse_interrupt6() ICACHE_RAM_ATTR;
 // void Plugin_003_pulse_interrupt7() ICACHE_RAM_ATTR;
 // void Plugin_003_pulse_interrupt8() ICACHE_RAM_ATTR;
 
-unsigned long Plugin_003_pulseCounter[TASKS_MAX];
-unsigned long Plugin_003_pulseTotalCounter[TASKS_MAX];
-unsigned long Plugin_003_pulseTime[TASKS_MAX];
-unsigned long Plugin_003_pulseTimePrevious[TASKS_MAX];
+volatile unsigned long Plugin_003_pulseCounter[TASKS_MAX];
+volatile unsigned long Plugin_003_pulseTotalCounter[TASKS_MAX];
+volatile unsigned long Plugin_003_pulseTime[TASKS_MAX];
+volatile unsigned long Plugin_003_pulseTimePrevious[TASKS_MAX];
 
 boolean Plugin_003(byte function, struct EventStruct *event, String& string)
 {
@@ -62,18 +65,24 @@ boolean Plugin_003(byte function, struct EventStruct *event, String& string)
         break;
       }
 
+    case PLUGIN_GET_DEVICEGPIONAMES:
+      {
+        event->String1 = formatGpioName_input(F("Pulse"));
+        break;
+      }
+
     case PLUGIN_WEBFORM_LOAD:
       {
-      	addFormNumericBox(string, F("Debounce Time (mSec)"), F("plugin_003")
+      	addFormNumericBox(F("Debounce Time (mSec)"), F("p003")
       			, Settings.TaskDevicePluginConfig[event->TaskIndex][0]);
 
         byte choice = Settings.TaskDevicePluginConfig[event->TaskIndex][1];
         byte choice2 = Settings.TaskDevicePluginConfig[event->TaskIndex][2];
         String options[4] = { F("Delta"), F("Delta/Total/Time"), F("Total"), F("Delta/Total") };
-        addFormSelector(string, F("Counter Type"), F("plugin_003_countertype"), 4, options, NULL, choice );
+        addFormSelector(F("Counter Type"), F("p003_countertype"), 4, options, NULL, choice );
 
         if (choice !=0)
-          string += F("<span style=\"color:red\">Total count is not persistent!</span>");
+          addHtml(F("<span style=\"color:red\">Total count is not persistent!</span>"));
 
         String modeRaise[4];
         modeRaise[0] = F("LOW");
@@ -86,7 +95,7 @@ boolean Plugin_003(byte function, struct EventStruct *event, String& string)
         modeValues[2] = RISING;
         modeValues[3] = FALLING;
 
-        addFormSelector(string, F("Mode Type"), F("plugin_003_raisetype"), 4, modeRaise, modeValues, choice2 );
+        addFormSelector(F("Mode Type"), F("p003_raisetype"), 4, modeRaise, modeValues, choice2 );
 
         success = true;
         break;
@@ -94,28 +103,28 @@ boolean Plugin_003(byte function, struct EventStruct *event, String& string)
 
     case PLUGIN_WEBFORM_SAVE:
       {
-        Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("plugin_003"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("plugin_003_countertype"));
-        Settings.TaskDevicePluginConfig[event->TaskIndex][2] = getFormItemInt(F("plugin_003_raisetype"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][0] = getFormItemInt(F("p003"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][1] = getFormItemInt(F("p003_countertype"));
+        Settings.TaskDevicePluginConfig[event->TaskIndex][2] = getFormItemInt(F("p003_raisetype"));
         success = true;
         break;
       }
 
     case PLUGIN_WEBFORM_SHOW_VALUES:
       {
-        string += F("<div class=\"div_l\">");
-        string += ExtraTaskSettings.TaskDeviceValueNames[0];
-        string += F(":</div><div class=\"div_r\">");
-        string += Plugin_003_pulseCounter[event->TaskIndex];
-        string += F("</div><div class=\"div_br\"></div><div class=\"div_l\">");
-        string += ExtraTaskSettings.TaskDeviceValueNames[1];
-        string += F(":</div><div class=\"div_r\">");
-        string += Plugin_003_pulseTotalCounter[event->TaskIndex];
-        string += F("</div><div class=\"div_br\"></div><div class=\"div_l\">");
-        string += ExtraTaskSettings.TaskDeviceValueNames[2];
-        string += F(":</div><div class=\"div_r\">");
-        string += Plugin_003_pulseTime[event->TaskIndex];
-        string += F("</div>");
+        addHtml(F("<div class=\"div_l\">"));
+        addHtml(String(ExtraTaskSettings.TaskDeviceValueNames[0]));
+        addHtml(F(":</div><div class=\"div_r\">"));
+        addHtml(String(Plugin_003_pulseCounter[event->TaskIndex]));
+        addHtml(F("</div><div class=\"div_br\"></div><div class=\"div_l\">"));
+        addHtml(String(ExtraTaskSettings.TaskDeviceValueNames[1]));
+        addHtml(F(":</div><div class=\"div_r\">"));
+        addHtml(String(Plugin_003_pulseTotalCounter[event->TaskIndex]));
+        addHtml(F("</div><div class=\"div_br\"></div><div class=\"div_l\">"));
+        addHtml(String(ExtraTaskSettings.TaskDeviceValueNames[2]));
+        addHtml(F(":</div><div class=\"div_r\">"));
+        addHtml(String(Plugin_003_pulseTime[event->TaskIndex]));
+        addHtml(F("</div>"));
         success = true;
         break;
       }
@@ -161,13 +170,32 @@ boolean Plugin_003(byte function, struct EventStruct *event, String& string)
           case 3:
           {
             event->sensorType = SENSOR_TYPE_DUAL;
-            UserVar[event->BaseVarIndex] = Plugin_003_pulseTotalCounter[event->TaskIndex];
+            UserVar[event->BaseVarIndex] = Plugin_003_pulseCounter[event->TaskIndex];
             UserVar[event->BaseVarIndex+1] = Plugin_003_pulseTotalCounter[event->TaskIndex];
             break;
           }
         }
         Plugin_003_pulseCounter[event->TaskIndex] = 0;
         success = true;
+        break;
+      }
+
+      case PLUGIN_WRITE:
+      {
+        String command = parseString(string, 1);
+        if (command == F("resetpulsecounter"))
+        {
+          // Allow for an optional taskIndex parameter. When not given it will take the first task with this plugin.
+          const taskIndex_t taskIndex = parseCommandArgumentTaskIndex(string, 2);
+          if (validTaskIndex(taskIndex)) {
+            if (event->TaskIndex != taskIndex) {
+              break;
+            }
+          }
+          Plugin_003_pulseCounter[event->TaskIndex] = 0;
+          Plugin_003_pulseTotalCounter[event->TaskIndex] = 0;
+          success = true; // Command is handled.
+        }
         break;
       }
   }
@@ -180,14 +208,20 @@ boolean Plugin_003(byte function, struct EventStruct *event, String& string)
 \*********************************************************************************************/
 void Plugin_003_pulsecheck(byte Index)
 {
-  unsigned long PulseTime=millis() - Plugin_003_pulseTimePrevious[Index];
-  if(PulseTime > Settings.TaskDevicePluginConfig[Index][0]) // check with debounce time for this task
+  noInterrupts(); // s0170071: avoid nested interrups due to bouncing.
+  
+  //  s0170071: the following gives a glitch if millis() rolls over (every 50 days) and there is a bouncing to be avoided at the exact same time. Very rare.
+  //  Alternatively there is timePassedSince(Plugin_003_pulseTimePrevious[Index]); but this is not in IRAM at this time, so do not use in a ISR!
+  const unsigned long PulseTime=millis() - Plugin_003_pulseTimePrevious[Index]; 
+  
+  if(PulseTime > (unsigned long)Settings.TaskDevicePluginConfig[Index][0]) // check with debounce time for this task
     {
       Plugin_003_pulseCounter[Index]++;
       Plugin_003_pulseTotalCounter[Index]++;
       Plugin_003_pulseTime[Index] = PulseTime;
       Plugin_003_pulseTimePrevious[Index]=millis();
     }
+  interrupts();   // enable interrupts again.
 }
 
 
@@ -267,3 +301,4 @@ bool Plugin_003_pulseinit(byte Par1, byte Index, byte Mode)
 
   return(true);
 }
+#endif // USES_P003
